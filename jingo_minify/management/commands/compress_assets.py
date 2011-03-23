@@ -1,10 +1,11 @@
 import os
+import hashlib
+import yaml
+
 from subprocess import call, PIPE
-
+	
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
-
-import git
+from django.core.management.base import BaseCommand
 
 
 path = lambda *a: os.path.join(settings.MEDIA_ROOT, *a)
@@ -23,31 +24,54 @@ class Command(BaseCommand):  #pragma: no cover
         v = ''
         if 'verbosity' in options and options['verbosity'] == '2':
             v = '-v'
-
+        
+        bundle_versions = {}
+        
         for ftype, bundle in settings.MINIFY_BUNDLES.iteritems():
+            
+            # Create the bundle file type dictonary
+            if ftype not in bundle_versions:
+                bundle_versions[ftype] = {}
+            
             for name, files in bundle.iteritems():
-                concatted_file = path(ftype, '%s-all.%s' % (name, ftype,))
-                compressed_file = path(ftype, '%s-min.%s' % (name, ftype,))
+                
+                namespace = getattr(settings, 'MINIFY_NAMESPACE', '')
+                
+                concatted_file_name = '%s%s-all.%s' % (namespace, name, ftype,)
+                compressed_file_name = '%s%s-min.%s' % (namespace, name, ftype,)
+                
+                concatted_file = path(ftype, concatted_file_name)
+                compressed_file = path(ftype, compressed_file_name)
                 real_files = [path(f.lstrip('/')) for f in files]
+                
+                if real_files:
+                    dir_name = os.path.dirname(compressed_file)
+                    if not os.path.exists(dir_name):
+                        os.makedirs(dir_name)
+                    
+                    # Concats the files.
+                    call("cat %s > %s" % (' '.join(real_files), concatted_file),
+                         shell=True)
+                    
+                    # # Compresses the concatenation.
+                    call("%s -jar %s %s %s -o %s" % (settings.JAVA_BIN, path_to_jar,
+                         v, concatted_file, compressed_file), shell=True, stdout=PIPE)
+                    
+                    file_hash = self.file_hash(compressed_file)
+                    
+                    bundle_versions[ftype][name] = {
+                        'hash': self.file_hash(compressed_file),
+                        'concatted': concatted_file_name,
+                        'compressed': compressed_file_name,}
+        
+        # Write settings to file
+        settings_yaml = open(settings.MINIFY_YAML_FILE, "w")
+        yaml.dump(bundle_versions, settings_yaml)
+        settings_yaml.close()
 
-                # Concats the files.
-                call("cat %s > %s" % (' '.join(real_files), concatted_file),
-                     shell=True)
-
-                # Compresses the concatenation.
-                call("%s -jar %s %s %s -o %s" % (settings.JAVA_BIN, path_to_jar,
-                     v, concatted_file, compressed_file), shell=True, stdout=PIPE)
-
-        build_id_file = os.path.realpath(os.path.join(
-            settings.ROOT, 'build.py'))
-
-        gitid = lambda path: git.repo.Repo(os.path.join(settings.ROOT,
-                path)).log('-1')[0].id_abbrev
-
-        with open(build_id_file, 'w') as f:
-            f.write('BUILD_ID_CSS = "%s"' % gitid('media/css'))
-            f.write("\n")
-            f.write('BUILD_ID_JS = "%s"' % gitid('media/js'))
-            f.write("\n")
-            f.write('BUILD_ID_IMG = "%s"' % gitid('media/img'))
-            f.write("\n")
+    def file_hash(self, filename):
+        f = open(filename, mode='rb')
+        try:
+            return hashlib.md5(f.read()).hexdigest()[:8]
+        finally:
+            f.close()

@@ -1,16 +1,7 @@
 from django.conf import settings
 
-import jingo
 from nose.tools import eq_
 
-
-try:
-    from build import BUILD_ID_CSS, BUILD_ID_JS
-except:
-    BUILD_ID_CSS = BUILD_ID_JS = 'dev'
-
-def setup():
-    jingo.load_helpers()
 
 def test_js_helper():
     """
