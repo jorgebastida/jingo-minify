@@ -12,10 +12,10 @@ to compress your JS and CSS with a Django_ management command `compress_assets`.
 
 Heres what happens:
 
-  1. `MINIFY_BUNDLES` is iterated.
-  2. `MINIFY_NAMESPACE` (optional setting) is used as the relative directory to store the assets.
-  3. `MINIFY_BUNDLES_MAP` is created mapping the bundle names to the files and there versions.
-  4. `MINIFY_YAML_FILE` is written to with the stored versions and names.
+1. `MINIFY_BUNDLES` is iterated.
+2. `MINIFY_NAMESPACE` (optional setting) is used as the relative directory to store the assets.
+3. `MINIFY_BUNDLES_MAP` is created mapping the bundle names to the files and there versions.
+4. `MINIFY_YAML_FILE` is written to with the stored versions and names.
 
 Warning
 =======
@@ -32,7 +32,7 @@ Assuming you've got Django_ installed and your using Jinja2_
 (Read more on: Django_Jinja2_integration_) then all you need to configure
 the creation of assets eg:
 
-`MINIFY_BUNDLES` in `settings.py` eg:
+`MINIFY_BUNDLES` in `settings.py` eg::
 
     MINIFY_BUNDLES = {
         'css': {
@@ -49,7 +49,7 @@ Add `MINIFY_YAML_FILE` location to settings.py - this will be where we store
 the bundle mapping. 
 
 Load the `MINIFY_BUNDLES_MAP` into your settings by adding the following code
-to `settings.py`:
+to `settings.py`::
 
     import yaml
     try:
@@ -74,7 +74,7 @@ Jinja2
 ======
 
 Load the Jinja2_ extensions `jinjo_minify/extensions.py` in your jinja environment.
-Heres and example environment configuration:
+Heres and example environment configuration::
 
     env = jinja2.Environment(
         loader=loader,
@@ -88,7 +88,7 @@ Heres and example environment configuration:
         autoescape=True,
     )
 
-Then in your template you do something like this:
+Then in your template you do something like this::
     
     <head>
         <!--[if !IE]><!--> 
@@ -109,7 +109,7 @@ Then in your template you do something like this:
 Nginx
 ======
 
-The outputted filenames are versioned like so:
+The outputted filenames are versioned like so::
 
     file_name.hash.ext
 
@@ -125,7 +125,7 @@ We don't use querystrings as:
 
 So you need to configure your Nginx / Apache / web server, to serve these
 assets with forever future expires and to ignore the 8 digits hash code.
-In Nginx I can do that like so:
+In Nginx I can do that like so::
 
     rewrite "/static/(.*).([\w]{8}).(.*)" /static/$1.$3;
     location /static {
