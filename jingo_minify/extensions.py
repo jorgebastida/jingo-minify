@@ -64,7 +64,7 @@ class JSCSSTagBase(Extension):
             
             name_split = bundle['compressed'].split('.')
             file_name, ext = '.'.join(name_split[:-1]), name_split[-1:][0]
-            items = ('%s/%s_%s.%s' % (media_type, file_name, bundle['hash'], ext),)
+            items = ('%s/%s__%s.%s' % (media_type, file_name, bundle['hash'], ext),)
         
         items = items or []
         
