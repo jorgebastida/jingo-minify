@@ -111,7 +111,7 @@ Nginx
 
 The outputted filenames are versioned like so::
 
-    file_name.hash.ext
+    { file_name }_{ hash }.{ ext }
 
 We don't use querystrings as: 
     
@@ -127,7 +127,7 @@ So you need to configure your Nginx / Apache / web server, to serve these
 assets with forever future expires and to ignore the 8 digits hash code.
 In Nginx I can do that like so::
 
-    rewrite "/static/(.*).([\w]{8}).(.*)" /static/$1.$3;
+    rewrite "/static/(.*)\_([\w]{8})\.(.*)" /static/$1.$3;
     location /static {
             access_log off;
             alias /home/your_website/static;
