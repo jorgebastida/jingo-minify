@@ -1,6 +1,8 @@
 import os
 import hashlib
 import yaml
+import re
+import shutil
 
 from subprocess import call, PIPE
 	
@@ -10,6 +12,7 @@ from django.core.management.base import BaseCommand
 
 path = lambda *a: os.path.join(settings.MEDIA_ROOT, *a)
 
+CSS_ASSET_PATTERN = re.compile('(?P<url>url(\([\'"]?(?P<filename>[^)]+\.[a-z]{3,4})(?P<fragment>#\w+)?[\'"]?\)))')
 
 class Command(BaseCommand):  #pragma: no cover
     help = ("Compresses css and js assets defined in settings.MINIFY_BUNDLES")
@@ -53,6 +56,10 @@ class Command(BaseCommand):  #pragma: no cover
                     call("cat %s > %s" % (' '.join(real_files), concatted_file),
                          shell=True)
                     
+                    # Rewrite image paths in css
+                    if ftype == 'css':
+                        self.rewrite_asset_paths_in_css(concatted_file)
+                        
                     # # Compresses the concatenation.
                     call("%s -jar %s %s %s -o %s" % (settings.JAVA_BIN, path_to_jar,
                          v, concatted_file, compressed_file), shell=True, stdout=PIPE)
@@ -68,7 +75,64 @@ class Command(BaseCommand):  #pragma: no cover
         settings_yaml = open(settings.MINIFY_YAML_FILE, "w")
         yaml.dump(bundle_versions, settings_yaml)
         settings_yaml.close()
-
+        
+    def rewrite_asset_paths_in_css(self, filename):
+        tmp = os.tmpfile()
+        rel_filename = os.path.join(settings.MEDIA_ROOT, filename)
+        css = open(rel_filename, mode='r')
+        
+        self.asset_hashs = {}
+        
+        for line in css:
+            matches = []
+            for match in re.finditer(CSS_ASSET_PATTERN, line):
+                try:
+                    grp = match.groupdict()
+                    absolute = grp['filename'].startswith('/')
+                    
+                    if absolute:
+                        asset_path = os.path.join(settings.MEDIA_ROOT, '.'+grp['filename'])
+                    else:
+                        asset_path = os.path.join(os.path.dirname(rel_filename), grp['filename'])
+                        
+                    asset = os.path.relpath(asset_path, settings.MEDIA_ROOT)
+                    
+                    asset_hash = self.get_asset_hash(asset)
+                    
+                    asset = grp['filename'].rsplit('.',1)
+                    asset[0]+= '__%s' % asset_hash
+                    asset = '.'.join(asset)
+                    
+                    asset_version = 'url(%s)' % asset
+                    matches.append((grp['url'], asset_version))
+                    
+                except KeyError:
+                    print "Failed to find %s in version map. Is it an absolute path?" % asset
+                    raise SystemExit(1)
+                    
+            for old, new in matches:
+                line = line.replace(old, new)
+            
+            tmp.write(line)
+            
+        tmp.flush()
+        tmp.seek(0)
+        css.close()
+        
+        css = open(rel_filename, mode='wb')
+        shutil.copyfileobj(tmp, css)
+    
+    def get_asset_hash(self, asset):
+        asset_hash = self.asset_hashs.get(asset, None)
+        if not asset_hash:
+            try:
+                asset_hash = self.file_hash(asset)
+                self.asset_hashs.update({asset:asset_hash})
+            except:
+                print 'Asset "%s" referenced in css and not found.' % asset
+                asset_hash = ''
+        return asset_hash
+                
     def file_hash(self, filename):
         f = open(filename, mode='rb')
         try:
